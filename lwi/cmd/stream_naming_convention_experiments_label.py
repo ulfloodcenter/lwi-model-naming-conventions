@@ -1,4 +1,5 @@
 import sys
+import os
 from typing import List, Dict, Set
 from collections import Counter, OrderedDict
 import sqlite3
@@ -11,8 +12,9 @@ FLOWLINE_REACHCODE = 1
 FLOWLINE_ORDER = 2
 FLOWLINE_DIVERGENCE = 3
 
-MAIN_STEM_LABEL_STR = '1000'
-MAIN_STEM_LABEL_INT = 1000
+MAIN_STEM_LABEL_BASE_STR = '0'
+MAIN_STEM_LABEL_BASE_INT = 0
+MAX_LEVEL_LABEL = 99
 LEVEL_SEP = '-'
 
 MAX_LABEL_LEN = 16
@@ -135,12 +137,24 @@ def _process_stream_segment(flowline_orders: Dict[int, Set[Flowline]], order:int
     _add_flowline_to_order_list(flowline_orders, order, curr_flowline)
 
 
+def _get_next_mainstem_label(order_label_count) -> str:
+    assert order_label_count[MAIN_STEM_LABEL_BASE_STR] < MAX_LEVEL_LABEL,\
+        f"Max main stem label {MAX_LEVEL_LABEL} exceeded."
+    order_label_count[MAIN_STEM_LABEL_BASE_STR] += 1
+    return "{0:02d}".format(order_label_count[MAIN_STEM_LABEL_BASE_STR])
+
+
+def _get_next_first_order_label(order_label_count, zeroth_order: str) -> str:
+    assert order_label_count[zeroth_order] < MAX_LEVEL_LABEL,\
+        f"Max first order label {MAX_LEVEL_LABEL} exceeded."
+    order_label_count[zeroth_order] += 1
+    return "{0}{1:02d}".format(zeroth_order, order_label_count[zeroth_order])
+
+
 def _determine_label_for_next_level(new_order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
     next_level_label = None
     if new_order == 1:
-        assert(order_label_count[MAIN_STEM_LABEL_INT] < MAIN_STEM_LABEL_INT)
-        order_label_count[MAIN_STEM_LABEL_INT] += 1
-        next_level_label = str(order_label_count[MAIN_STEM_LABEL_INT] + MAIN_STEM_LABEL_INT)
+        next_level_label = _get_next_first_order_label(order_label_count, curr_level_label)
     elif new_order > 1:
         # Only add a level to the label hierarchy if new_order is 2nd order tributary or greater
         level_stream_count_label = curr_level_label + LEVEL_SEP + '0'
@@ -153,12 +167,10 @@ def _determine_label_for_prev_level(new_order: int, curr_level_label: str, order
     # print("_determine_label_for_prev_level: curr_level_label: {0}, new_order: {1}".format(curr_level_label, new_order))
     prev_level_label = None
     if new_order == 0:
-        prev_level_label = MAIN_STEM_LABEL_STR
+        prev_level_label = _get_next_mainstem_label(order_label_count)
         # print(f"\tprev_level_label: {prev_level_label}")
     elif new_order == 1:
-        assert(order_label_count[MAIN_STEM_LABEL_INT] < MAIN_STEM_LABEL_INT)
-        order_label_count[MAIN_STEM_LABEL_INT] += 1
-        prev_level_label = str(order_label_count[MAIN_STEM_LABEL_INT] + MAIN_STEM_LABEL_INT)
+        prev_level_label = _get_next_first_order_label(order_label_count, curr_level_label[0:2])
     elif new_order > 1:
         components = curr_level_label.split(LEVEL_SEP)
         level_stream_count_label = None
@@ -177,7 +189,7 @@ def _determine_label_for_prev_level(new_order: int, curr_level_label: str, order
 
 def assign_stream_segment_order(flowline, plusflow, huc8: str,
                                 curr_flowline: Flowline, flowline_orders: Dict[int, Set[Flowline]],
-                                order=0, label=MAIN_STEM_LABEL_STR,
+                                order=0, label=MAIN_STEM_LABEL_BASE_STR,
                                 order_label_count: Counter = Counter(), visit_count: Counter = Counter(), itr_meta={}):
     # print("assign_stream_segment_order: curr_flowline: {0}".format(curr_flowline))
     if visit_count[curr_flowline.comid] > 0:
@@ -263,6 +275,7 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code) -> OrderedDict:
     iteration_metadata = {}
     for root_flowline in root_flowlines:
         assign_stream_segment_order(flowline, plusflow, huc8, root_flowline, stream_orders,
+                                    label=_get_next_mainstem_label(order_label_count),
                                     order_label_count=order_label_count, itr_meta=iteration_metadata)
     # Store stream labels in a dictionary with key=label and value=list of flowlines with that label
     # Super inefficient
@@ -364,9 +377,9 @@ WS_DATA_SUBSET = [
 def do_label_streams_for_huc8(ws):
     print("Begin: do_label_streams_for_huc8 for watershed: {0}".format(ws))
 
-    flowline_conn = sqlite3.connect('NHDFlowline_Network.sqlite')
+    flowline_conn = sqlite3.connect(os.environ.get('NHD_FLOWLINE', 'NHDFlowline_Network.sqlite'))
     flowline = flowline_conn.cursor()
-    plusflow_conn = sqlite3.connect('NHD_PlusFlow.sqlite')
+    plusflow_conn = sqlite3.connect(os.environ.get('NHD_PLUSFLOW', 'NHD_PlusFlow.sqlite'))
     plusflow = plusflow_conn.cursor()
 
     ws_code = ws[0]
