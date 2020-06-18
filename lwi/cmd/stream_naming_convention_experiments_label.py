@@ -14,10 +14,14 @@ FLOWLINE_DIVERGENCE = 3
 
 MAIN_STEM_LABEL_BASE_STR = '0'
 MAIN_STEM_LABEL_BASE_INT = 0
+MAX_MAIN_STEM_NUM = 255
+MAX_FIRST_ORDER_NUM = 255
 MAX_LEVEL_LABEL = 99
 LEVEL_SEP = '-'
 
-MAX_LABEL_LEN = 16
+MAX_LABEL_LEN = 14
+MAX_FQ_LABEL_LEN = 16
+MAX_LABEL_LEVEL = 6
 
 class Flowline:
     def __init__(self, comid, reachcode, strahler_order, divergence, hack_order=None, label=''):
@@ -114,21 +118,18 @@ def _add_flowline_to_order_list(flowline_orders: Dict[int, Set[Flowline]], order
 
 
 def _pad_stream_label(label_in, hierarchy_levels, hierarchy_separator='-', empty_level_indicator='0'):
-    padded_segments = []
     segments = label_in.split(hierarchy_separator)
-    for s in segments:
-        padded_segments.append(s)
-    for i in range(len(padded_segments), hierarchy_levels):
-        padded_segments.append(empty_level_indicator)
     padded_buff = io.StringIO()
     # Create compact label
-    for i, s in enumerate(padded_segments):
+    for i, s in enumerate(segments):
         if i == 0:
             padded_buff.write(s)
         else:
             padded_buff.write(f"{int(s):02}")
-    compact_label = padded_buff.getvalue()
-    return hierarchy_separator.join(padded_segments), compact_label
+    padded_label = padded_buff.getvalue()
+    # Fill missing hierarchy levels with 0
+    padded_label = padded_label.ljust(MAX_LABEL_LEN, '0')
+    return padded_label
 
 
 def _process_stream_segment(flowline_orders: Dict[int, Set[Flowline]], order:int, curr_flowline: Flowline, label:str):
@@ -138,17 +139,20 @@ def _process_stream_segment(flowline_orders: Dict[int, Set[Flowline]], order:int
 
 
 def _get_next_mainstem_label(order_label_count) -> str:
-    assert order_label_count[MAIN_STEM_LABEL_BASE_STR] < MAX_LEVEL_LABEL,\
-        f"Max main stem label {MAX_LEVEL_LABEL} exceeded."
+    assert order_label_count[MAIN_STEM_LABEL_BASE_STR] < MAX_MAIN_STEM_NUM,\
+        f"Max main stem label {MAX_MAIN_STEM_NUM} exceeded."
     order_label_count[MAIN_STEM_LABEL_BASE_STR] += 1
-    return "{0:02d}".format(order_label_count[MAIN_STEM_LABEL_BASE_STR])
+    # Return as zero-padded hexadecimal
+    return "{0:#0x}".format(order_label_count[MAIN_STEM_LABEL_BASE_STR])[2:].rjust(2, '0')
 
 
 def _get_next_first_order_label(order_label_count, zeroth_order: str) -> str:
-    assert order_label_count[zeroth_order] < MAX_LEVEL_LABEL,\
-        f"Max first order label {MAX_LEVEL_LABEL} exceeded."
+    assert order_label_count[zeroth_order] < MAX_FIRST_ORDER_NUM,\
+        f"Max first order label {MAX_FIRST_ORDER_NUM} exceeded."
     order_label_count[zeroth_order] += 1
-    return "{0}{1:02d}".format(zeroth_order, order_label_count[zeroth_order])
+    # Convert to zero-padded hexadecimal
+    first_order = "{0:#0x}".format(order_label_count[zeroth_order])[2:].rjust(2, '0')
+    return "{0}{1}".format(zeroth_order, first_order)
 
 
 def _determine_label_for_next_level(new_order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
@@ -293,15 +297,12 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code) -> OrderedDict:
     label_depth = iteration_metadata['max_order']
     print("Max depth for HUC8 '{0}' was: {1}".format(huc8, label_depth))
     max_compact_length = 0
-    max_padded_length = 0
     for k in sorted(raw_flowlines_by_stream_id.keys()):
-        (padded_label, compact_label) = _pad_stream_label(k, label_depth)
-        # print(f"padded_label: {padded_label}; compact_label: {compact_label}")
+        compact_label = _pad_stream_label(k, MAX_LABEL_LEVEL)
+        # print(f"compact_label: {compact_label}")
         max_compact_length = max(max_compact_length, len(compact_label))
-        max_padded_length = max(max_padded_length, len(padded_label))
         flowlines_by_stream_id[compact_label] = raw_flowlines_by_stream_id[k]
     print(f"\tMax compact label length was {max_compact_length}")
-    print(f"\tMax padded label length was {max_padded_length}")
     return flowlines_by_stream_id
 
 
@@ -360,7 +361,7 @@ WS_DATA = [
     ("BZ", "12040201", "Sabine Lake"),
 ]
 
-WS_DATA_SUBSET = [
+WS_DATA_DEBUG = [
     ("AA", "03180004", "Lower Pearl"),
     # ("AC", "08040202", "Lower Ouachita-Bayou De Loutre"),
     # ("AD", "08040205", "Bayou Bartholemew"),
@@ -397,8 +398,8 @@ def do_label_streams_for_huc8(ws):
             for f in flowlines:
                 label = f"{ws_code}{k}"
                 label_len = len(label)
-                if label_len > MAX_LABEL_LEN:
-                    print(f"!!! WARNING: Stream label {label} has length {label_len}, which is longer than the max length of {MAX_LABEL_LEN}")
+                if label_len > MAX_FQ_LABEL_LEN:
+                    print(f"!!! WARNING: Stream label {label} has length {label_len}, which is longer than the max length of {MAX_FQ_LABEL_LEN}")
                 w.writerow({
                     'stream_label': f"{ws_code}{k}",
                     'ws_code': ws_code,
