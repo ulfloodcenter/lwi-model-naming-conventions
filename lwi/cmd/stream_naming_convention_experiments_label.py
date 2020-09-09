@@ -75,7 +75,7 @@ def get_flowline(cur, comid: int):
 
 def get_downstream_flowlines(flowline, plusflow, comid: int):
     downstream_flowlines = []
-    plusflow.execute('select tocomid from nhd_plusflow where fromcomid=?', (comid,))
+    plusflow.execute('select tocomid from plusflow where fromcomid=?', (comid,))
     for row in plusflow:
         f = get_flowline(flowline, row[0])
         if f:
@@ -85,7 +85,7 @@ def get_downstream_flowlines(flowline, plusflow, comid: int):
 
 def get_upstream_flowlines(flowline, plusflow, comid: int):
     upstream_flowlines = []
-    plusflow.execute('select fromcomid from nhd_plusflow where tocomid=? order by fromcomid', (comid,))
+    plusflow.execute('select fromcomid from plusflow where tocomid=? order by fromcomid', (comid,))
     for row in plusflow:
         f = get_flowline(flowline, row[0])
         if f:
