@@ -1,4 +1,5 @@
 import sys
+import os
 from typing import List, Dict, Set
 from collections import Counter, OrderedDict
 import sqlite3
@@ -11,11 +12,19 @@ FLOWLINE_REACHCODE = 1
 FLOWLINE_ORDER = 2
 FLOWLINE_DIVERGENCE = 3
 
-MAIN_STEM_LABEL_STR = '1000'
-MAIN_STEM_LABEL_INT = 1000
+MAIN_STEM_LABEL_BASE_STR = '0'
+MAIN_STEM_LABEL_BASE_INT = 0
+MAX_MAIN_STEM_NUM = 255
+MAX_FIRST_ORDER_NUM = 255
+MAX_LEVEL_LABEL = 99
 LEVEL_SEP = '-'
 
-MAX_LABEL_LEN = 16
+MAX_LABEL_LEN = 14
+MAX_FQ_LABEL_LEN = 16
+MAX_LABEL_LEVEL = 6
+
+OUTPUT_PREFIX = 'output'
+
 
 class Flowline:
     def __init__(self, comid, reachcode, strahler_order, divergence, hack_order=None, label=''):
@@ -66,7 +75,7 @@ def get_flowline(cur, comid: int):
 
 def get_downstream_flowlines(flowline, plusflow, comid: int):
     downstream_flowlines = []
-    plusflow.execute('select tocomid from nhd_plusflow where fromcomid=?', (comid,))
+    plusflow.execute('select tocomid from plusflow where fromcomid=?', (comid,))
     for row in plusflow:
         f = get_flowline(flowline, row[0])
         if f:
@@ -76,7 +85,7 @@ def get_downstream_flowlines(flowline, plusflow, comid: int):
 
 def get_upstream_flowlines(flowline, plusflow, comid: int):
     upstream_flowlines = []
-    plusflow.execute('select fromcomid from nhd_plusflow where tocomid=? order by fromcomid', (comid,))
+    plusflow.execute('select fromcomid from plusflow where tocomid=? order by fromcomid', (comid,))
     for row in plusflow:
         f = get_flowline(flowline, row[0])
         if f:
@@ -112,21 +121,18 @@ def _add_flowline_to_order_list(flowline_orders: Dict[int, Set[Flowline]], order
 
 
 def _pad_stream_label(label_in, hierarchy_levels, hierarchy_separator='-', empty_level_indicator='0'):
-    padded_segments = []
     segments = label_in.split(hierarchy_separator)
-    for s in segments:
-        padded_segments.append(s)
-    for i in range(len(padded_segments), hierarchy_levels):
-        padded_segments.append(empty_level_indicator)
     padded_buff = io.StringIO()
     # Create compact label
-    for i, s in enumerate(padded_segments):
+    for i, s in enumerate(segments):
         if i == 0:
             padded_buff.write(s)
         else:
             padded_buff.write(f"{int(s):02}")
-    compact_label = padded_buff.getvalue()
-    return hierarchy_separator.join(padded_segments), compact_label
+    padded_label = padded_buff.getvalue()
+    # Fill missing hierarchy levels with 0
+    padded_label = padded_label.ljust(MAX_LABEL_LEN, '0')
+    return padded_label
 
 
 def _process_stream_segment(flowline_orders: Dict[int, Set[Flowline]], order:int, curr_flowline: Flowline, label:str):
@@ -135,12 +141,35 @@ def _process_stream_segment(flowline_orders: Dict[int, Set[Flowline]], order:int
     _add_flowline_to_order_list(flowline_orders, order, curr_flowline)
 
 
-def _determine_label_for_next_level(new_order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
+def _get_next_mainstem_label(order_label_count) -> str:
+    assert order_label_count[MAIN_STEM_LABEL_BASE_STR] < MAX_MAIN_STEM_NUM,\
+        f"Max main stem label {MAX_MAIN_STEM_NUM} exceeded."
+    order_label_count[MAIN_STEM_LABEL_BASE_STR] += 1
+    # Return as zero-padded hexadecimal
+    return "{0:#0x}".format(order_label_count[MAIN_STEM_LABEL_BASE_STR])[2:].rjust(2, '0')
+
+
+def _get_next_first_order_label(order_label_count, zeroth_order: str) -> str:
+    assert order_label_count[zeroth_order] < MAX_FIRST_ORDER_NUM,\
+        f"Max first order label {MAX_FIRST_ORDER_NUM} exceeded."
+    order_label_count[zeroth_order] += 1
+    # Convert to zero-padded hexadecimal
+    first_order = "{0:#0x}".format(order_label_count[zeroth_order])[2:].rjust(2, '0')
+    return "{0}{1}".format(zeroth_order, first_order)
+
+
+def _get_next_nth_order_label(order_label_count, n_plus_oneth_order: str) -> str:
+    components = n_plus_oneth_order.split(LEVEL_SEP)
+    nth_level_stub = LEVEL_SEP.join(components[:-1]) + LEVEL_SEP
+    level_stream_count_label = nth_level_stub + '0'
+    order_label_count[level_stream_count_label] += 1
+    return nth_level_stub + str(order_label_count[level_stream_count_label])
+
+
+def _get_next_label_for_next_level(new_order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
     next_level_label = None
     if new_order == 1:
-        assert(order_label_count[MAIN_STEM_LABEL_INT] < MAIN_STEM_LABEL_INT)
-        order_label_count[MAIN_STEM_LABEL_INT] += 1
-        next_level_label = str(order_label_count[MAIN_STEM_LABEL_INT] + MAIN_STEM_LABEL_INT)
+        next_level_label = _get_next_first_order_label(order_label_count, curr_level_label)
     elif new_order > 1:
         # Only add a level to the label hierarchy if new_order is 2nd order tributary or greater
         level_stream_count_label = curr_level_label + LEVEL_SEP + '0'
@@ -149,35 +178,42 @@ def _determine_label_for_next_level(new_order: int, curr_level_label: str, order
     return next_level_label
 
 
-def _determine_label_for_prev_level(new_order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
+def _get_next_label_for_prev_level(new_order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
+    assert new_order >= 0, f"_get_next_label_for_prev_level() new_ordder should be > 0, but was {new_order}."
     # print("_determine_label_for_prev_level: curr_level_label: {0}, new_order: {1}".format(curr_level_label, new_order))
     prev_level_label = None
     if new_order == 0:
-        prev_level_label = MAIN_STEM_LABEL_STR
+        prev_level_label = _get_next_mainstem_label(order_label_count)
         # print(f"\tprev_level_label: {prev_level_label}")
     elif new_order == 1:
-        assert(order_label_count[MAIN_STEM_LABEL_INT] < MAIN_STEM_LABEL_INT)
-        order_label_count[MAIN_STEM_LABEL_INT] += 1
-        prev_level_label = str(order_label_count[MAIN_STEM_LABEL_INT] + MAIN_STEM_LABEL_INT)
-    elif new_order > 1:
-        components = curr_level_label.split(LEVEL_SEP)
-        level_stream_count_label = None
-        prev_level_stub = None
-        if new_order == 2:
-            prev_level_stub = LEVEL_SEP.join(components[:-1]) + LEVEL_SEP
-        else:
-            prev_level_stub = LEVEL_SEP.join(components[:-2]) + LEVEL_SEP
-        level_stream_count_label = prev_level_stub + '0'
-        order_label_count[level_stream_count_label] += 1
-        prev_level_label = prev_level_stub + str(order_label_count[level_stream_count_label])
+        prev_level_label = _get_next_first_order_label(order_label_count, curr_level_label[0:2])
+    else:
+        # new_order > 1
+        prev_level_label = _get_next_nth_order_label(order_label_count, curr_level_label)
 
     # print("\tprev_level_label: {0}".format(prev_level_label))
     return prev_level_label
 
 
+def _get_next_label_for_curr_level(order: int, curr_level_label: str, order_label_count: Counter = Counter()) -> str:
+
+    assert order >= 0, f"_get_next_label_for_prev_level() new_ordder should be > 0, but was {order}."
+
+    new_label = None
+    if order == 0:
+        new_label = _get_next_mainstem_label(order_label_count)
+    elif order == 1:
+        new_label = _get_next_first_order_label(order_label_count, curr_level_label[0:2])
+    else:
+        # order > 1
+        new_label = _get_next_nth_order_label(order_label_count, curr_level_label)
+
+    return new_label
+
+
 def assign_stream_segment_order(flowline, plusflow, huc8: str,
                                 curr_flowline: Flowline, flowline_orders: Dict[int, Set[Flowline]],
-                                order=0, label=MAIN_STEM_LABEL_STR,
+                                order=0, label=MAIN_STEM_LABEL_BASE_STR,
                                 order_label_count: Counter = Counter(), visit_count: Counter = Counter(), itr_meta={}):
     # print("assign_stream_segment_order: curr_flowline: {0}".format(curr_flowline))
     if visit_count[curr_flowline.comid] > 0:
@@ -202,16 +238,25 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
             if u.strahler_order == curr_flowline.strahler_order:
                 # Upstream flowline is of the same order as current flowline, add to list of flowlines for this
                 # order
-                if curr_flowline.divergence == 2 and u.divergence != curr_flowline.divergence:
+                if curr_flowline.divergence > 1 and u.divergence != curr_flowline.divergence:
                     # The current flowline is a minor flowpath of a divergence, but the "upstream" flowline is either
                     # not on a divergence (divergence=0), or is the major flowpath of a divergence (divergence=1).
                     # In these cases, we don't want to recurse upstream from the minor flowpath as this will result
                     # in a spurious level in the hierarchy being created.
+                    # print("assign_stream_segment_order(): curr_flowline.divergence == 2 and u.divergence != curr_flowline.divergence")
                     continue
                 else:
+                    new_label = None
+                    if u.divergence > 1 and u.divergence != curr_flowline.divergence:
+                        # "Upstream" flowline is a minor flowpath (divergence=2, but sometimes also divergence=9),
+                        # but current flowline is not. Give the minor flowpath a new name at the current level
+                        # print("assign_stream_segment_order(): upstream flowline is a minor flowpath, give it a new name.")
+                        new_label = _get_next_label_for_curr_level(order, label, order_label_count)
+                    else:
+                        new_label = label
                     # Proceed upstream, using the same label as we are still at the same level of the hierarchy
                     assign_stream_segment_order(flowline, plusflow, huc8, u, flowline_orders,
-                                                order=order, label=label,
+                                                order=order, label=new_label,
                                                 order_label_count=order_label_count, visit_count=visit_count,
                                                 itr_meta=itr_meta)
             else:
@@ -227,12 +272,12 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
                         new_label = label
                     else:
                         new_order = order - 1
-                        new_label = _determine_label_for_prev_level(new_order, label, order_label_count)
+                        new_label = _get_next_label_for_prev_level(new_order, label, order_label_count)
                 else:
                     # Upstream flowline has a lower Strahler order. Go up order and level in the label hierarchy
                     new_order = order + 1
                     try:
-                        new_label = _determine_label_for_next_level(new_order, label, order_label_count)
+                        new_label = _get_next_label_for_next_level(new_order, label, order_label_count)
                     except Exception as e:
                         mesg = f"\n\n_determine_label_for_next_level threw Exception: {e} for HUC8 {huc8}, " \
                                f"curr_flowline: {curr_flowline}, order: {order}\n\n"
@@ -244,7 +289,7 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
                                             itr_meta=itr_meta)
 
 
-def label_streams_for_huc8(flowline, plusflow, huc8, ws_code) -> OrderedDict:
+def label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log) -> OrderedDict:
     flowlines_by_stream_id = OrderedDict()
 
     # Find watershed outlets (i.e. root flowlines)
@@ -263,9 +308,13 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code) -> OrderedDict:
     iteration_metadata = {}
     for root_flowline in root_flowlines:
         assign_stream_segment_order(flowline, plusflow, huc8, root_flowline, stream_orders,
+                                    label=_get_next_mainstem_label(order_label_count),
                                     order_label_count=order_label_count, itr_meta=iteration_metadata)
+
+    log.write(f"Statistics for Watershed {ws_code}, HUC8 '{huc8}'...\n")
+
     # Store stream labels in a dictionary with key=label and value=list of flowlines with that label
-    # Super inefficient
+    # (super inefficient)
     raw_flowlines_by_stream_id = {}
     for o in stream_orders.keys():
         for f in stream_orders[o]:
@@ -276,19 +325,29 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code) -> OrderedDict:
                 flowlines_with_id = []
                 raw_flowlines_by_stream_id[f.label] = flowlines_with_id
             flowlines_with_id.append(f)
-    # Now sort by ID and reformat IDs to contain the full hierarchy
+    # Now sort by ID, reformat IDs to contain the full hierarchy, and convert to compact form
+    # without delimiters
     label_depth = iteration_metadata['max_order']
-    print("Max depth for HUC8 '{0}' was: {1}".format(huc8, label_depth))
+    log.write(f"\tMax depth was: {label_depth}\n")
     max_compact_length = 0
-    max_padded_length = 0
     for k in sorted(raw_flowlines_by_stream_id.keys()):
-        (padded_label, compact_label) = _pad_stream_label(k, label_depth)
-        # print(f"padded_label: {padded_label}; compact_label: {compact_label}")
+        compact_label = _pad_stream_label(k, MAX_LABEL_LEVEL)
+        # print(f"compact_label: {compact_label}")
         max_compact_length = max(max_compact_length, len(compact_label))
-        max_padded_length = max(max_padded_length, len(padded_label))
         flowlines_by_stream_id[compact_label] = raw_flowlines_by_stream_id[k]
-    print(f"\tMax compact label length was {max_compact_length}")
-    print(f"\tMax padded label length was {max_padded_length}")
+    log.write(f"\tMax compact label length was {max_compact_length}\n")
+
+    # Calculate statistics on the number of streams in each order
+    num_reaches_per_order = [0] * (label_depth + 2)
+    for k in order_label_count:
+        if k == MAIN_STEM_LABEL_BASE_STR:
+            num_reaches_per_order[0] = order_label_count[k]
+        else:
+            c = k.split(LEVEL_SEP)
+            num_reaches_per_order[len(c)] = order_label_count[k]
+    for i, count in enumerate(num_reaches_per_order):
+        log.write(f"\tNum streams of order {i}: {count}\n")
+
     return flowlines_by_stream_id
 
 
@@ -347,7 +406,7 @@ WS_DATA = [
     ("BZ", "12040201", "Sabine Lake"),
 ]
 
-WS_DATA_SUBSET = [
+WS_DATA_DEBUG = [
     ("AA", "03180004", "Lower Pearl"),
     # ("AC", "08040202", "Lower Ouachita-Bayou De Loutre"),
     # ("AD", "08040205", "Bayou Bartholemew"),
@@ -364,35 +423,39 @@ WS_DATA_SUBSET = [
 def do_label_streams_for_huc8(ws):
     print("Begin: do_label_streams_for_huc8 for watershed: {0}".format(ws))
 
-    flowline_conn = sqlite3.connect('NHDFlowline_Network.sqlite')
+    flowline_conn = sqlite3.connect(os.environ.get('NHD_FLOWLINE', 'NHDFlowline_Network.sqlite'))
     flowline = flowline_conn.cursor()
-    plusflow_conn = sqlite3.connect('NHD_PlusFlow.sqlite')
+    plusflow_conn = sqlite3.connect(os.environ.get('NHD_PLUSFLOW', 'NHD_PlusFlow.sqlite'))
     plusflow = plusflow_conn.cursor()
 
     ws_code = ws[0]
     huc8 = ws[1]
 
-    flowlines_by_stream_id = label_streams_for_huc8(flowline, plusflow, huc8, ws_code)
-    # Save results as CSV
-    outfile = f"output/{ws_code}_{huc8}.csv"
-    with open(outfile, 'w') as csvfile:
-        fieldnames = ['stream_label', 'ws_code', 'huc8', 'comid', 'reachcode']
-        w = csv.DictWriter(csvfile, delimiter=',', quotechar='"', fieldnames=fieldnames)
-        w.writeheader()
-        for k in flowlines_by_stream_id.keys():
-            flowlines = flowlines_by_stream_id[k]
-            for f in flowlines:
-                label = f"{ws_code}{k}"
-                label_len = len(label)
-                if label_len > MAX_LABEL_LEN:
-                    print(f"!!! WARNING: Stream label {label} has length {label_len}, which is longer than the max length of {MAX_LABEL_LEN}")
-                w.writerow({
-                    'stream_label': f"{ws_code}{k}",
-                    'ws_code': ws_code,
-                    'huc8': huc8,
-                    'comid': f.comid,
-                    'reachcode': f.reachcode
-                })
+    log_file = f"{OUTPUT_PREFIX}/{ws_code}_{huc8}.txt"
+    with open(log_file, 'w', encoding='utf-8') as log:
+        flowlines_by_stream_id = label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log)
+        # Save results as CSV
+        outfile = f"{OUTPUT_PREFIX}/{ws_code}_{huc8}.csv"
+        with open(outfile, 'w') as csvfile:
+            fieldnames = ['stream_label', 'ws_code', 'huc8', 'comid', 'reachcode', 'divergence']
+            w = csv.DictWriter(csvfile, delimiter=',', quotechar='"', fieldnames=fieldnames)
+            w.writeheader()
+            for k in flowlines_by_stream_id.keys():
+                flowlines = flowlines_by_stream_id[k]
+                for f in flowlines:
+                    label = f"{ws_code}{k}"
+                    label_len = len(label)
+                    if label_len > MAX_FQ_LABEL_LEN:
+                        log.write(f"!!! WARNING: Stream label {label} has length {label_len}, which is longer than the max length of {MAX_FQ_LABEL_LEN}\n")
+                    w.writerow({
+                        'stream_label': f"{ws_code}{k}",
+                        'ws_code': ws_code,
+                        'huc8': huc8,
+                        'comid': f.comid,
+                        'reachcode': f.reachcode,
+                        'divergence': f.divergence
+                    })
+
     print("Finish: do_label_streams_for_huc8 for watershed: {0}".format(ws))
 
 
