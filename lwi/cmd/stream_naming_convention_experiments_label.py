@@ -246,14 +246,7 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
                     # print("assign_stream_segment_order(): curr_flowline.divergence == 2 and u.divergence != curr_flowline.divergence")
                     continue
                 else:
-                    new_label = None
-                    if u.divergence > 1 and u.divergence != curr_flowline.divergence:
-                        # "Upstream" flowline is a minor flowpath (divergence=2, but sometimes also divergence=9),
-                        # but current flowline is not. Give the minor flowpath a new name at the current level
-                        # print("assign_stream_segment_order(): upstream flowline is a minor flowpath, give it a new name.")
-                        new_label = _get_next_label_for_curr_level(order, label, order_label_count)
-                    else:
-                        new_label = label
+                    new_label = label
                     # Proceed upstream, using the same label as we are still at the same level of the hierarchy
                     assign_stream_segment_order(flowline, plusflow, huc8, u, flowline_orders,
                                                 order=order, label=new_label,
