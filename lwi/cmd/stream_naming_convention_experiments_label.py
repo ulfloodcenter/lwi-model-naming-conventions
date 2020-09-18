@@ -75,7 +75,7 @@ def get_flowline(cur, comid: int):
 
 def get_downstream_flowlines(flowline, plusflow, comid: int):
     downstream_flowlines = []
-    plusflow.execute('select tocomid from plusflow where fromcomid=?', (comid,))
+    plusflow.execute('select tocomid from plusflow where fromcomid=? order by tocomid asc', (comid,))
     for row in plusflow:
         f = get_flowline(flowline, row[0])
         if f:
@@ -85,7 +85,7 @@ def get_downstream_flowlines(flowline, plusflow, comid: int):
 
 def get_upstream_flowlines(flowline, plusflow, comid: int):
     upstream_flowlines = []
-    plusflow.execute('select fromcomid from plusflow where tocomid=? order by fromcomid', (comid,))
+    plusflow.execute('select fromcomid from plusflow where tocomid=? order by fromcomid desc', (comid,))
     for row in plusflow:
         f = get_flowline(flowline, row[0])
         if f:
@@ -286,7 +286,7 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log) -> OrderedDic
     flowlines_by_stream_id = OrderedDict()
 
     # Find watershed outlets (i.e. root flowlines)
-    query = "select comid from nhdflowline_network where reachcode like '{huc8}%' and startflag=1".format(huc8=huc8)
+    query = "select comid from nhdflowline_network where reachcode like '{huc8}%' and startflag=1 order by comid desc".format(huc8=huc8)
     flowline.execute(query)
     root_flowlines = set()
     for i, feat in enumerate(flowline.fetchall(), 1):
@@ -299,6 +299,8 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log) -> OrderedDic
     stream_orders = {}
     order_label_count = Counter()
     iteration_metadata = {}
+    # Sort root flowlines by comid to ensure consistent
+    root_flowlines = sorted(root_flowlines, key=lambda f: f.comid)
     for root_flowline in root_flowlines:
         assign_stream_segment_order(flowline, plusflow, huc8, root_flowline, stream_orders,
                                     label=_get_next_mainstem_label(order_label_count),
@@ -453,5 +455,9 @@ def do_label_streams_for_huc8(ws):
 
 
 if __name__ == '__main__':
+    # Parallel
     with(multiprocessing.Pool(multiprocessing.cpu_count())) as p:
         p.map(do_label_streams_for_huc8, WS_DATA)
+    # Synchronous
+    # for ws in WS_DATA:
+    #     do_label_streams_for_huc8(ws)
