@@ -9,8 +9,9 @@ import multiprocessing
 
 FLOWLINE_COMID = 0
 FLOWLINE_REACHCODE = 1
-FLOWLINE_ORDER = 2
-FLOWLINE_DIVERGENCE = 3
+FLOWLINE_LEVEL = 2
+FLOWLINE_ORDER = 3
+FLOWLINE_DIVERGENCE = 4
 
 MAIN_STEM_LABEL_BASE_STR = '0'
 MAIN_STEM_LABEL_BASE_INT = 0
@@ -27,17 +28,19 @@ OUTPUT_PREFIX = 'output'
 
 
 class Flowline:
-    def __init__(self, comid, reachcode, strahler_order, divergence, hack_order=None, label=''):
+    def __init__(self, comid, reachcode, stream_level, strahler_order, divergence, hack_order=None, label=''):
         self.comid = comid
         self.reachcode = reachcode
+        self.stream_level = stream_level
         self.strahler_order = strahler_order
         self.divergence = divergence
         self.hack_order = hack_order
         self.label = label
 
     def __str__(self):
-        return f"Flowline(comid={self.comid}, reachcode={self.reachcode}, strahler_order={self.strahler_order}, " \
-               f"divergence={self.divergence}, hack_order={self.hack_order}, label={self.label})"
+        return f"Flowline(comid={self.comid}, reachcode={self.reachcode}, stream_level={self.stream_level}, " \
+               f"strahler_order={self.strahler_order}, divergence={self.divergence}, " \
+               f"hack_order={self.hack_order}, label={self.label})"
 
     def __repr__(self):
         return self.__str__()
@@ -48,6 +51,8 @@ class Flowline:
         if self.comid != o.comid:
             return False
         if self.reachcode != o.reachcode:
+            return False
+        if self.stream_level != o.stream_level:
             return False
         if self.strahler_order != o.strahler_order:
             return False
@@ -60,16 +65,17 @@ class Flowline:
         return True
 
     def __hash__(self) -> int:
-        return hash(self.comid) + hash(self.reachcode) + hash(self.strahler_order) + \
+        return hash(self.comid) + hash(self.reachcode) + hash(self.stream_level) + hash(self.strahler_order) + \
             hash(self.divergence) + hash(self.hack_order) + hash(self.label)
 
 
 def get_flowline(cur, comid: int):
-    cur.execute('select comid, reachcode, streamorde, divergence from nhdflowline_network where comid=?', (comid,))
+    cur.execute('select comid, reachcode, streamleve, streamorde, divergence from nhdflowline_network where comid=?',
+                (comid,))
     f = cur.fetchone()
     if f is None:
         return f
-    return Flowline(comid=f[FLOWLINE_COMID], reachcode=f[FLOWLINE_REACHCODE],
+    return Flowline(comid=f[FLOWLINE_COMID], reachcode=f[FLOWLINE_REACHCODE], stream_level=f[FLOWLINE_LEVEL],
                     strahler_order=f[FLOWLINE_ORDER], divergence=f[FLOWLINE_DIVERGENCE])
 
 
@@ -238,13 +244,23 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
             if u.strahler_order == curr_flowline.strahler_order:
                 # Upstream flowline is of the same order as current flowline, add to list of flowlines for this
                 # order
-                if curr_flowline.divergence > 1 and u.divergence != curr_flowline.divergence:
-                    # The current flowline is a minor flowpath of a divergence, but the "upstream" flowline is either
-                    # not on a divergence (divergence=0), or is the major flowpath of a divergence (divergence=1).
-                    # In these cases, we don't want to recurse upstream from the minor flowpath as this will result
-                    # in a spurious level in the hierarchy being created.
-                    # print("assign_stream_segment_order(): curr_flowline.divergence == 2 and u.divergence != curr_flowline.divergence")
-                    continue
+                if curr_flowline.divergence > 1:
+                    if u.divergence != curr_flowline.divergence:
+                        # The current flowline is a minor flowpath of a divergence, but the "upstream" flowline is either
+                        # not on a divergence (divergence=0), or is the major flowpath of a divergence (divergence=1).
+                        # In these cases, we don't want to recurse upstream from the minor flowpath as this will result
+                        # in a spurious level in the hierarchy being created.
+                        # print("assign_stream_segment_order(): curr_flowline.divergence == 2 and u.divergence != curr_flowline.divergence")
+                        continue
+                    if u.stream_level < curr_flowline.stream_level:
+                        # The current flowline is a minor flowpath of a divergence and has a stream level higher
+                        # than the "upstream" flowline (this can happen in cases of compound divergent flow).
+                        # this means that the upstream flowline is closer to being on the mainstem than the current
+                        # flowline, so we don't want to propagate upstream from here as despite having the same Stahler
+                        # orders, the current divergence flowline is further derived from the main stem than the
+                        # upstream flowline (we want the upstream flowline to be named named from another reach
+                        # downstream of it that is closer to being on the main stem).
+                        continue
                 else:
                     new_label = label
                     # Proceed upstream, using the same label as we are still at the same level of the hierarchy
@@ -299,7 +315,7 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log) -> OrderedDic
     stream_orders = {}
     order_label_count = Counter()
     iteration_metadata = {}
-    # Sort root flowlines by comid to ensure consistent
+    # Sort root flowlines by comid to ensure consistent traversal across invocations
     root_flowlines = sorted(root_flowlines, key=lambda f: f.comid)
     for root_flowline in root_flowlines:
         assign_stream_segment_order(flowline, plusflow, huc8, root_flowline, stream_orders,
