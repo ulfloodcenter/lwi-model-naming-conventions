@@ -315,8 +315,11 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log) -> OrderedDic
     stream_orders = {}
     order_label_count = Counter()
     iteration_metadata = {}
-    # Sort root flowlines by comid to ensure consistent traversal across invocations
-    root_flowlines = sorted(root_flowlines, key=lambda f: f.comid)
+    # Sort root flowlines by descending comid, descending strahler order, and ascending stream level to ensure
+    # consistent traversal across invocations starting with the most downstream flowlines (i.e. highest comid).
+    root_flowlines = sorted(root_flowlines, key=lambda f: f.comid, reverse=True)
+    root_flowlines = sorted(root_flowlines, key=lambda f: f.strahler_order, reverse=True)
+    root_flowlines = sorted(root_flowlines, key=lambda f: f.stream_level)
     for root_flowline in root_flowlines:
         assign_stream_segment_order(flowline, plusflow, huc8, root_flowline, stream_orders,
                                     label=_get_next_mainstem_label(order_label_count),
