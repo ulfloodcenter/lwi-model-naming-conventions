@@ -65,4 +65,4 @@ rm /tmp/LA_HUC8_stream_labels.csv /tmp/LA_HUC8_stream_labels-sorted.csv
 
 ## Example data
 
-Example output that has been joined to NHD Flowlines for HUC8s in the state of Louisiana can be found [here](https://services9.arcgis.com/SfvtKAxCn62UWpRg/arcgis/rest/services/LWI_LabeledNHDStreams_2020_09_10/FeatureServer).
+Example output that has been joined to NHD Flowlines for HUC8s in the state of Louisiana can be found [here](https://services9.arcgis.com/SfvtKAxCn62UWpRg/arcgis/rest/services/LWI_LabeledNHDStreams_2020_09_22/FeatureServer).
