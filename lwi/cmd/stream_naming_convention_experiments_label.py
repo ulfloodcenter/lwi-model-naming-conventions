@@ -418,6 +418,8 @@ WS_DATA = [
     ("BX", "12010004", "Toledo Bend Reservoir"),
     ("BY", "12010005", "Lower Sabine"),
     ("BZ", "12040201", "Sabine Lake"),
+    ("CA", "12010001", "Upper Sabine"),
+    ("CB", "12010003", "Lake Fork"),
 ]
 
 WS_DATA_DEBUG = [
