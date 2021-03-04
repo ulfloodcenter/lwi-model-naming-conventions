@@ -23,16 +23,18 @@ Export these layers:
 * PlusFlow
 
 ```
-ogr2ogr -f "SQLite" NHDFlowline_Network.sqlite NHDPlusNationalData/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb NHDFlowline_Network
+ogr2ogr -f "SQLite" -dsco "SPATIALITE=YES" NHDFlowline_Network.spatialite NHDPlusNationalData/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb NHDFlowline_Network
 ogr2ogr -f "SQLite" NHD_PlusFlow.sqlite NHDPlusNationalData/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb PlusFlow
 ```
+
+> Note if you want
 
 ### Add indexes for fast searching
 
 #### NHDFlowline_Network
 
 ```
-sqlite3 NHDFlowline_Network.sqlite \
+sqlite3 NHDFlowline_Network.spatialite \
 "create index if not exists nhd_flow_reachcode_idx on nhdflowline_network (reachcode); \
 create index if not exists nhd_flow_comid_idx on nhdflowline_network (comid);"
 ```
@@ -49,7 +51,7 @@ create index if not exists nhd_plusflow_fromcomid_idx on plusflow (fromcomid);"
 
 ### Label streams
 ```
-NHD_FLOWLINE=/path/to/NHDFlowline_Network.sqlite NHD_PLUSFLOW=/path/to/NHD_PlusFlow.sqlite python stream_naming_convention_experiments_label.py
+NHD_FLOWLINE=/path/to/NHDFlowline_Network.spatialite NHD_PLUSFLOW=/path/to/NHD_PlusFlow.sqlite python stream_naming_convention_experiments_label.py
 ```
 Output will be stored in a directory named `output`.
 

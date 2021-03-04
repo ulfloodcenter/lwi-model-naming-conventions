@@ -263,24 +263,17 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
                         continue
                 else:
                     if u.divergence > 1:
-                        # sys.stderr.write(("u.strahler_order == curr_flowline.strahler_order and u.divergence > 1, "
-                        #                   f"for HUC: {huc8} and flowline {str(curr_flowline)}\n"))
-                        # Upstream flowline is a minor flowpath of a divergence, mark it as a tributary at the next
-                        # level in the hierarchy (rather than carrying the current label, in which case we would have
-                        # two parallel segments with the same name, which can be problematic for models such as HEC-RAS).
-                        new_order = order + 1
-                        try:
-                            new_label = _get_next_label_for_next_level(new_order, label, order_label_count)
-                        except Exception as e:
-                            mesg = f"\n\n_determine_label_for_next_level threw Exception: {e} for HUC8 {huc8}, " \
-                                   f"curr_flowline: {curr_flowline}, order: {order}\n\n"
-                            sys.exit(mesg)
+                        # Upstream flowline is a minor flowpath of a divergence, create a new label at the current
+                        # level in the hierarchy instead of carrying the current label upstream. This will avoid
+                        # there being two parallel segments with the same name, which can be problematic for models
+                        # such as HEC-RAS.
+                        new_label = _get_next_label_for_curr_level(order, label, order_label_count)
                     else:
                         # Proceed upstream, using the same label as we are still at the same level of the hierarchy
-                        new_order = order
+                        # new_order = order
                         new_label = label
                     assign_stream_segment_order(flowline, plusflow, huc8, u, flowline_orders,
-                                                order=new_order, label=new_label,
+                                                order=order, label=new_label,
                                                 order_label_count=order_label_count, visit_count=visit_count,
                                                 itr_meta=itr_meta)
             else:
@@ -373,10 +366,7 @@ def label_streams_for_huc8(flowline, plusflow, huc8, ws_code, log) -> OrderedDic
             num_reaches_per_order[0] = order_label_count[k]
         else:
             c = k.split(LEVEL_SEP)
-            try:
-                num_reaches_per_order[len(c)] = order_label_count[k]
-            except IndexError:
-                import pdb; pdb.set_trace()
+            num_reaches_per_order[len(c)] = order_label_count[k]
     for i, count in enumerate(num_reaches_per_order):
         log.write(f"\tNum streams of order {i}: {count}\n")
 
@@ -454,7 +444,8 @@ WS_DATA_DEBUG = [
     # ("BN", "11140203", "Loggy Bayou"),
     # ("CA", "12010001", "Upper Sabine"),
     # ("CB", "12010003", "Lake Fork"),
-    ("BC", "08080203", "Upper Calcasieu"),
+    # ("BC", "08080203", "Upper Calcasieu"),
+    ("BN", "11140203", "Loggy Bayou"),
 ]
 
 
