@@ -103,17 +103,22 @@ def find_root_flowlines(flowline, plusflow, huc8: str, curr_flowline: Flowline,
                         root_flowlines: set=set(), visited: set=set()) -> Flowline:
     visited.add(curr_flowline)
     # print("\tfind_root_flowline: {0}".format(curr_flowline))
-    downstream = get_downstream_flowlines(flowline, plusflow, curr_flowline.comid)
-    for d in downstream:
-        # print("\t\tdownstream: {0}".format(d))
-        if d.reachcode.startswith(huc8):
-            # Downstream flowline is in the same watershed, keep searching downstream...
-            if d not in visited:
-                find_root_flowlines(flowline, plusflow, huc8, d, root_flowlines, visited)
-        else:
-            # Downstream flowline is not in the same watershed, curr_flowline is a root flowline
-            # in the watershed.
-            root_flowlines.add(curr_flowline)
+
+    if curr_flowline.stream_level == 1.0:
+        # Current flowline terminates on the coastline, add as a root flowline, don't search "downstream"
+        root_flowlines.add(curr_flowline)
+    else:
+        downstream = get_downstream_flowlines(flowline, plusflow, curr_flowline.comid)
+        for d in downstream:
+            # print("\t\tdownstream: {0}".format(d))
+            if d.reachcode.startswith(huc8):
+                # Downstream flowline is in the same watershed, keep searching downstream...
+                if d not in visited:
+                    find_root_flowlines(flowline, plusflow, huc8, d, root_flowlines, visited)
+            else:
+                # Downstream flowline is not in the same watershed, curr_flowline is a root flowline
+                # in the watershed.
+                root_flowlines.add(curr_flowline)
 
 
 def _add_flowline_to_order_list(flowline_orders: Dict[int, Set[Flowline]], order, flowline):
@@ -445,14 +450,15 @@ WS_DATA_DEBUG = [
     # ("CA", "12010001", "Upper Sabine"),
     # ("CB", "12010003", "Lake Fork"),
     # ("BC", "08080203", "Upper Calcasieu"),
-    ("BN", "11140203", "Loggy Bayou"),
+    # ("BN", "11140203", "Loggy Bayou"),
+    ("AZ", "08080103", "Vermilion"),
 ]
 
 
 def do_label_streams_for_huc8(ws):
     print("Begin: do_label_streams_for_huc8 for watershed: {0}".format(ws))
 
-    flowline_conn = sqlite3.connect(os.environ.get('NHD_FLOWLINE', 'NHDFlowline_Network.sqlite'))
+    flowline_conn = sqlite3.connect(os.environ.get('NHD_FLOWLINE', 'NHDFlowline_Network.spatialite'))
     flowline = flowline_conn.cursor()
     plusflow_conn = sqlite3.connect(os.environ.get('NHD_PLUSFLOW', 'NHD_PlusFlow.sqlite'))
     plusflow = plusflow_conn.cursor()
@@ -490,8 +496,8 @@ def do_label_streams_for_huc8(ws):
 
 if __name__ == '__main__':
     # Parallel
-    # with(multiprocessing.Pool(multiprocessing.cpu_count())) as p:
-    #     p.map(do_label_streams_for_huc8, WS_DATA)
+    with(multiprocessing.Pool(multiprocessing.cpu_count())) as p:
+        p.map(do_label_streams_for_huc8, WS_DATA)
     # Synchronous
-    for ws in WS_DATA_DEBUG:
-        do_label_streams_for_huc8(ws)
+    # for ws in WS_DATA_DEBUG:
+    #     do_label_streams_for_huc8(ws)
