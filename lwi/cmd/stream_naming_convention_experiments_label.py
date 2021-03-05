@@ -17,7 +17,7 @@ MAIN_STEM_LABEL_BASE_STR = '0'
 MAIN_STEM_LABEL_BASE_INT = 0
 MAX_MAIN_STEM_NUM = 255
 MAX_FIRST_ORDER_NUM = 255
-MAX_LEVEL_LABEL = 99
+MAX_LEVEL_LABEL = 255
 LEVEL_SEP = '-'
 
 MAX_LABEL_LEN = 14
@@ -131,6 +131,10 @@ def _add_flowline_to_order_list(flowline_orders: Dict[int, Set[Flowline]], order
     flowlines_for_order.add(flowline)
 
 
+def _int_to_hex_str(num: int) -> str:
+    return "{0:#0x}".format(num)[2:].rjust(2, '0')
+
+
 def _pad_stream_label(label_in, hierarchy_levels, hierarchy_separator='-', empty_level_indicator='0'):
     segments = label_in.split(hierarchy_separator)
     padded_buff = io.StringIO()
@@ -139,7 +143,8 @@ def _pad_stream_label(label_in, hierarchy_levels, hierarchy_separator='-', empty
         if i == 0:
             padded_buff.write(s)
         else:
-            padded_buff.write(f"{int(s):02}")
+            # Convert 2nd and higher orders to hexadecimal here
+            padded_buff.write(_int_to_hex_str(int(s)))
     padded_label = padded_buff.getvalue()
     # Fill missing hierarchy levels with 0
     padded_label = padded_label.ljust(MAX_LABEL_LEN, '0')
@@ -451,7 +456,8 @@ WS_DATA_DEBUG = [
     # ("CB", "12010003", "Lake Fork"),
     # ("BC", "08080203", "Upper Calcasieu"),
     # ("BN", "11140203", "Loggy Bayou"),
-    ("AZ", "08080103", "Vermilion"),
+    ("AY", "08080102", "Bayou Teche"),
+    # ("AZ", "08080103", "Vermilion"),
 ]
 
 
