@@ -103,17 +103,22 @@ def find_root_flowlines(flowline, plusflow, huc8: str, curr_flowline: Flowline,
                         root_flowlines: set=set(), visited: set=set()) -> Flowline:
     visited.add(curr_flowline)
     # print("\tfind_root_flowline: {0}".format(curr_flowline))
-    downstream = get_downstream_flowlines(flowline, plusflow, curr_flowline.comid)
-    for d in downstream:
-        # print("\t\tdownstream: {0}".format(d))
-        if d.reachcode.startswith(huc8):
-            # Downstream flowline is in the same watershed, keep searching downstream...
-            if d not in visited:
-                find_root_flowlines(flowline, plusflow, huc8, d, root_flowlines, visited)
-        else:
-            # Downstream flowline is not in the same watershed, curr_flowline is a root flowline
-            # in the watershed.
-            root_flowlines.add(curr_flowline)
+
+    if curr_flowline.stream_level == 1.0:
+        # Current flowline terminates on the coastline, add as a root flowline, don't search "downstream"
+        root_flowlines.add(curr_flowline)
+    else:
+        downstream = get_downstream_flowlines(flowline, plusflow, curr_flowline.comid)
+        for d in downstream:
+            # print("\t\tdownstream: {0}".format(d))
+            if d.reachcode.startswith(huc8):
+                # Downstream flowline is in the same watershed, keep searching downstream...
+                if d not in visited:
+                    find_root_flowlines(flowline, plusflow, huc8, d, root_flowlines, visited)
+            else:
+                # Downstream flowline is not in the same watershed, curr_flowline is a root flowline
+                # in the watershed.
+                root_flowlines.add(curr_flowline)
 
 
 def _add_flowline_to_order_list(flowline_orders: Dict[int, Set[Flowline]], order, flowline):
@@ -262,8 +267,16 @@ def assign_stream_segment_order(flowline, plusflow, huc8: str,
                         # downstream of it that is closer to being on the main stem).
                         continue
                 else:
-                    new_label = label
-                    # Proceed upstream, using the same label as we are still at the same level of the hierarchy
+                    if u.divergence > 1:
+                        # Upstream flowline is a minor flowpath of a divergence, create a new label at the current
+                        # level in the hierarchy instead of carrying the current label upstream. This will avoid
+                        # there being two parallel segments with the same name, which can be problematic for models
+                        # such as HEC-RAS.
+                        new_label = _get_next_label_for_curr_level(order, label, order_label_count)
+                    else:
+                        # Proceed upstream, using the same label as we are still at the same level of the hierarchy
+                        # new_order = order
+                        new_label = label
                     assign_stream_segment_order(flowline, plusflow, huc8, u, flowline_orders,
                                                 order=order, label=new_label,
                                                 order_label_count=order_label_count, visit_count=visit_count,
@@ -423,23 +436,29 @@ WS_DATA = [
 ]
 
 WS_DATA_DEBUG = [
-    ("AA", "03180004", "Lower Pearl"),
+    # ("AA", "03180004", "Lower Pearl"),
     # ("AC", "08040202", "Lower Ouachita-Bayou De Loutre"),
     # ("AD", "08040205", "Bayou Bartholemew"),
     # ("AM", "08050001", "Boeuf"),
     # ("BK", "11140202", "Middle Red-Coushatta"),
     # ("AU", "08070204", "Lake Maurepas"),
     # ("AZ", "08080103", "Vermilion"),
-    ("BM", "11140202", "Middle Red-Coushatta"),
+    # ("BM", "11140202", "Middle Red-Coushatta"),
     # ("BT", "11140209", "Black Lake Bayou"),
     # ("BX", "12040201", "Sabine Lake"),
+    # ("BN", "11140203", "Loggy Bayou"),
+    # ("CA", "12010001", "Upper Sabine"),
+    # ("CB", "12010003", "Lake Fork"),
+    # ("BC", "08080203", "Upper Calcasieu"),
+    # ("BN", "11140203", "Loggy Bayou"),
+    ("AZ", "08080103", "Vermilion"),
 ]
 
 
 def do_label_streams_for_huc8(ws):
     print("Begin: do_label_streams_for_huc8 for watershed: {0}".format(ws))
 
-    flowline_conn = sqlite3.connect(os.environ.get('NHD_FLOWLINE', 'NHDFlowline_Network.sqlite'))
+    flowline_conn = sqlite3.connect(os.environ.get('NHD_FLOWLINE', 'NHDFlowline_Network.spatialite'))
     flowline = flowline_conn.cursor()
     plusflow_conn = sqlite3.connect(os.environ.get('NHD_PLUSFLOW', 'NHD_PlusFlow.sqlite'))
     plusflow = plusflow_conn.cursor()
@@ -480,5 +499,5 @@ if __name__ == '__main__':
     with(multiprocessing.Pool(multiprocessing.cpu_count())) as p:
         p.map(do_label_streams_for_huc8, WS_DATA)
     # Synchronous
-    # for ws in WS_DATA:
+    # for ws in WS_DATA_DEBUG:
     #     do_label_streams_for_huc8(ws)
