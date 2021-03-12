@@ -18,6 +18,8 @@ https://s3.amazonaws.com/edap-nhdplus/NHDPlusV21/Data/NationalData/NHDPlusV21_Na
 
 ### Export to SQLite
 
+#### NHDPlus V2.1
+
 Export these layers:
 * NHDFlowline_Network
 * PlusFlow
@@ -27,11 +29,25 @@ ogr2ogr -f "SQLite" -dsco "SPATIALITE=YES" NHDFlowline_Network.spatialite NHDPlu
 ogr2ogr -f "SQLite" NHD_PlusFlow.sqlite NHDPlusNationalData/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb PlusFlow
 ```
 
-> Note if you want
+#### NHDPlus HR
+
+HUC4-based
+```
+ogr2ogr -skipfailures -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_1114_HU4_GDB/NHDPLUS_H_1114_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_1204_HU4_GDB/NHDPLUS_H_1204_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_1201_HU4_GDB/NHDPLUS_H_1201_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0809_HU4_GDB/NHDPLUS_H_0809_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0808_HU4_GDB/NHDPLUS_H_0808_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0807_HU4_GDB/NHDPLUS_H_0807_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0806_HU4_GDB/NHDPLUS_H_0806_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0805_HU4_GDB/NHDPLUS_H_0805_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0804_HU4_GDB/NHDPLUS_H_0804_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA && \
+ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sqlite NHDPLUS_H_0318_HU4_GDB/NHDPLUS_H_0318_HU4_GDB.gdb NHDFlowline NHDPlusFlow NHDPlusFlowlineVAA
+```
 
 ### Add indexes for fast searching
 
-#### NHDFlowline_Network
+#### NHDPlus v2.1: NHDFlowline_Network
 
 ```
 sqlite3 NHDFlowline_Network.spatialite \
@@ -39,7 +55,8 @@ sqlite3 NHDFlowline_Network.spatialite \
 create index if not exists nhd_flow_comid_idx on nhdflowline_network (comid);"
 ```
 
-#### PlusFlow
+#### NHDPlus v2.1: PlusFlow
+
 
 ```
 sqlite3 NHD_PlusFlow.sqlite \
@@ -47,12 +64,34 @@ sqlite3 NHD_PlusFlow.sqlite \
 create index if not exists nhd_plusflow_fromcomid_idx on plusflow (fromcomid);"
 ```
 
+#### NHDPlusHR
+
+```
+sqlite3 NHDPlusHR-LA.sqlite \
+"create index if not exists nhdflowline_nhdplusid_idx on nhdflowline (nhdplusid); \
+create index if not exists nhdplusflowlinevaa_nhdplusid_idx on nhdplusflowlinevaa (nhdplusid); \
+create index if not exists nhdplusflow_fromnhdpid_idx on nhdplusflow(fromnhdpid); \
+create index if not exists nhdplusflow_tonhdpid_idx on nhdplusflow(tonhdpid);"
+```
+
+
 ## How to Use
 
 ### Label streams
+
+NHDPlus V2:
 ```
-NHD_FLOWLINE=/path/to/NHDFlowline_Network.spatialite NHD_PLUSFLOW=/path/to/NHD_PlusFlow.sqlite python stream_naming_convention_experiments_label.py
+python3 stream_naming_convention_experiments_label.py -f /path/to/NHDFlowline_Network.spatialite -p /path/to/NHD_PlusFlow.sqlite
 ```
+
+NHDPlus HR:
+```
+python3 stream_naming_convention_experiments_label.py -f /path/to/NHDFlowline_Network.spatialite --nhdhr
+```
+
+> Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
+> add the `--base32` command line option.
+
 Output will be stored in a directory named `output`.
 
 ### Concatenate output into one file
