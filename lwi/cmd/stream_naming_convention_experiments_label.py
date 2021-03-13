@@ -639,7 +639,7 @@ def main():
 
     # Parallel
     with(multiprocessing.Pool(multiprocessing.cpu_count())) as p:
-        par_args = [(ws, flowline_path, plusflow_path, args.nhdhr, args.base32) for ws in WS_DATA_DEBUG]
+        par_args = [(ws, flowline_path, plusflow_path, args.nhdhr, args.base32) for ws in WS_DATA]
         p.map(parallel_do_label_streams_for_huc8, par_args)
     # Synchronous
     # for ws in WS_DATA_DEBUG:

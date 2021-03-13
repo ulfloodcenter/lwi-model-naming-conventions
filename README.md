@@ -89,8 +89,11 @@ NHDPlus HR:
 python3 stream_naming_convention_experiments_label.py -f /path/to/NHDFlowline_Network.spatialite --nhdhr
 ```
 
-> Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
-> add the `--base32` command line option.
+> WARNING: NHDPlus HD seems to lack flow topology information in the NHDPlusFlow table needed to
+> successfully run the LWI naming algorithm.
+
+Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
+add the `--base32` command line option.
 
 Output will be stored in a directory named `output`.
 
