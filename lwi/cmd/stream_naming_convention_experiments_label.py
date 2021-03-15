@@ -431,15 +431,16 @@ def label_streams_for_huc8(flowline, plusflow, headwater_reaches, huc8, ws_code,
     stream_orders = {}
     order_label_count = Counter()
     iteration_metadata = {}
-    # Sort root flowlines by descending comid, descending strahler order, and ascending stream level to ensure
-    # consistent traversal across invocations starting with the most downstream flowlines (i.e. highest comid).
+    # Sort root flowlines by descending reachcode, descending strahler order, ascending stream level to ensure
+    # consistent traversal across invocations starting with the most downstream flowlines (i.e. highest reachcode).
+    # Also sort by divergence to make sure the first flowline isn't a minor flowpath of a divergence.
     # Doesn't seem to make sense to sort NHDPlusHR flow lines by NHDPlusID as it doesn't seem to vary predictably
     # downstream
-    if not nhd_hr:
-        root_flowlines = sorted(root_flowlines, key=lambda f: f.comid, reverse=True)
+    root_flowlines = sorted(root_flowlines, key=lambda f: f.reachcode, reverse=True)
     root_flowlines = sorted(root_flowlines, key=lambda f: f.strahler_order, reverse=True)
     root_flowlines = sorted(root_flowlines, key=lambda f: f.stream_level)
-    log.write(f"DEBUG: len(root_flowlines): {len(root_flowlines)}")
+    root_flowlines = sorted(root_flowlines, key=lambda f: f.divergence)
+    log.write(f"DEBUG: len(root_flowlines): {len(root_flowlines)}\n")
     for root_flowline in root_flowlines:
         assign_stream_segment_order(flowline, plusflow, huc8, root_flowline, stream_orders,
                                     label=_get_next_mainstem_label(order_label_count, base32),
@@ -559,8 +560,8 @@ WS_DATA_DEBUG = [
     # ("CB", "12010003", "Lake Fork"),
     # ("BC", "08080203", "Upper Calcasieu"),
     # ("BN", "11140203", "Loggy Bayou"),
-    ("AY", "08080102", "Bayou Teche"),
-    ("AZ", "08080103", "Vermilion"),
+    # ("AY", "08080102", "Bayou Teche"),
+    # ("AZ", "08080103", "Vermilion"),
 ]
 
 

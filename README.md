@@ -51,7 +51,7 @@ ogr2ogr -skipfailures -append -f "SQLite" -dsco "SPATIALITE=YES" NHDPlusHR-LA.sq
 
 ```
 sqlite3 NHDFlowline_Network.spatialite \
-"create index if not exists nhd_flow_reachcode_idx on nhdflowline_network (reachcode); \
+"create index if not exists nhd_flow_reachcode_idx on nhdflowline_network (reachcode COLLATE NOCASE); \
 create index if not exists nhd_flow_comid_idx on nhdflowline_network (comid);"
 ```
 
