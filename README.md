@@ -101,7 +101,7 @@ Output will be stored in a directory named `output`.
 ```
 tail -q -n +2 *.csv > /tmp/LA_HUC8_stream_labels.csv
 cat /tmp/LA_HUC8_stream_labels.csv | sort > /tmp/LA_HUC8_stream_labels-sorted.csv
-head -n 1 AA_03180004.csv | cat - /tmp/LA_HUC8_stream_labels-sorted.csv > LA_HUC8_stream_labels.csv
+head -n 1 LP_03180004.csv | cat - /tmp/LA_HUC8_stream_labels-sorted.csv > LA_HUC8_stream_labels.csv
 rm /tmp/LA_HUC8_stream_labels.csv /tmp/LA_HUC8_stream_labels-sorted.csv
 ```
 
