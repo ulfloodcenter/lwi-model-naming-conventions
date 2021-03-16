@@ -2,6 +2,14 @@
 
 ## Setup
 
+### Pre-requisites
+- Python 3
+
+#### Dependencies
+```
+pip install base32-crockford
+```
+
 ### Download NHDPlus seemless geodatabase
 
 From [https://www.epa.gov/waterdata/nhdplus-national-data](https://www.epa.gov/waterdata/nhdplus-national-data)
