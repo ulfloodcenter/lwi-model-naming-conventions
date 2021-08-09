@@ -1,5 +1,7 @@
+# Copyright (C) 2021-present State of Louisiana, Division of Administration, Office of Community Development.
+# All rights reserved. Licensed under the GPLv3 License. See LICENSE.txt in the project root for license information.
+
 import sys
-import os
 from typing import Tuple, List, Dict, Set, Callable
 from collections import Counter, OrderedDict
 import sqlite3
