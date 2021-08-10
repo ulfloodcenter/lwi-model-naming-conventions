@@ -19,6 +19,7 @@ setuptools.setup(
     ],
     python_requires='>=3.7',
     install_requires=[
+        'base32-crockford'
     ],
     tests_require=[
     ],
