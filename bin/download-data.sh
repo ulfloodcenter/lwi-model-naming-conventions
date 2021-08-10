@@ -1,7 +1,10 @@
 #!/bin/bash
 
-mkdir -p /tmp/data
-cd /tmp/data
+# Copyright (C) 2021-present State of Louisiana, Division of Administration, Office of Community Development.
+# All rights reserved. Licensed under the GPLv3 License. See LICENSE.txt in the project root for license information.
+
+mkdir -p data
+cd data
 
 # Download data
 echo "Downloading NHDPlus V2 data..."
