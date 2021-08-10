@@ -18,6 +18,8 @@
 
 ### Installation
 ```
+git clone <PUT_URL_HERE>
+cd <PUT_CLONED_DIR_HERE>
 python3 -m venv venv
 source venv/bin/activate
 python3 setup.py install
@@ -28,14 +30,14 @@ python3 setup.py install
 ### Label streams (using NHDPlus V2 data)
 ```
 mkdir -p output
-lwi-label-nhd-streams -f /path/to/NHDFlowline_Network.spatialite -p /path/to/NHD_PlusFlow.sqlite
+lwi-label-nhd-streams -f data/NHDFlowline_Network.spatialite -p data/NHD_PlusFlow.sqlite
 ```
 > Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
 > add the `--base32` command line option.
 
 Output will be stored in a directory named `output`.
 
-### Concatenate output into one file
+### Combine output into one CSV file and add header
 ```
 tail -q -n +2 *.csv > /tmp/LA_HUC8_stream_labels.csv
 cat /tmp/LA_HUC8_stream_labels.csv | sort > /tmp/LA_HUC8_stream_labels-sorted.csv
