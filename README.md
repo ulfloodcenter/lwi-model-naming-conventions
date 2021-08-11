@@ -33,7 +33,7 @@ If not, see <https://www.gnu.org/licenses/>.
 ./bin/download-data.sh
 ```
 
-> This will take a while. Go get a coffee, or lunch.
+> This will take a while. Go get coffee, or lunch.
 
 ### Installation
 ```
@@ -54,7 +54,7 @@ lwi-label-nhd-streams -f data/NHDFlowline_Network.spatialite -p data/NHD_PlusFlo
 > Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
 > add the `--base32` command line option.
 
-By default, this will use the file `input/LWI_watersheds.csv' to control which HUC8 watersheds will have
+By default, this will use the file `input/LWI_watersheds.csv` to control which HUC8 watersheds will have
 their streams labeled, and also control what the two-letter watershed codes are to be used for each HUC8.
 To use another watershed definition file, use the `-w` option. Use the `--help` to see all options.
 
