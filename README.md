@@ -3,13 +3,14 @@
 ## Setup
 
 ### Pre-requisites
+- Unix-like environment ([WSL](https://docs.microsoft.com/en-us/windows/wsl/about) should work)
 - Python 3.7+
 - GDAL 3+ (version 2+ may work as well)
 - SQLite 3
 - 7z
 - wget
 
-### Data download and prepare
+### Download and prepare data
 ```
 ./bin/download-data.sh
 ```
