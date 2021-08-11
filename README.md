@@ -1,4 +1,4 @@
-# LWI Stream Naming Convention Example code
+# LWI Model Naming Conventions: Stream naming algorithm
 
 ## License
 Louisiana Watershed Initiative (LWI) Stream Naming Convention Algorithm.
