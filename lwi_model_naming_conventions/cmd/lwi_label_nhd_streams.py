@@ -569,7 +569,11 @@ def main():
                               f"Defaults to {multiprocessing.cpu_count()} on this machine."))
     parser.add_argument('--nhdhr', action='store_true', help='Use NHDPlus HR', default=False)
     parser.add_argument('--base32', action='store_true',
-                        help='Encode stream reach IDs as Crockford base32 instead of hexadecimal. Default: True', default=True)
+                        help='Encode stream reach IDs as Crockford base32 instead of hexadecimal. Default: True',
+                        default=True)
+    parser.add_argument('--hexadecimal', action='store_true',
+                        help='Encode stream reach IDs as hexadecimal instead of Crockford base32. Default: False',
+                        default=False)
     args = parser.parse_args()
 
     flowline_path = args.flowline
@@ -577,13 +581,17 @@ def main():
     if args.plusflow:
         plusflow_path = args.plusflow
 
+    use_base32 = False
+    if args.base32 and not args.hexadecimal:
+        use_base32 = True
+
     # Load watershed data
     ws_data = load_watersheds_data(args.watersheds)
 
     if args.num_threads > 1:
         # Parallel
         with(multiprocessing.Pool(args.num_threads)) as p:
-            par_args = [(ws, flowline_path, plusflow_path, args.nhdhr, args.base32) for ws in ws_data]
+            par_args = [(ws, flowline_path, plusflow_path, args.nhdhr, use_base32) for ws in ws_data]
             p.map(parallel_do_label_streams_for_huc8, par_args)
     else:
         # Synchronous

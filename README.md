@@ -51,12 +51,13 @@ python3 setup.py install
 mkdir -p output
 lwi-label-nhd-streams -f data/NHDFlowline_Network.spatialite -p data/NHD_PlusFlow.sqlite
 ```
-> Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
-> add the `--base32` command line option.
 
-By default, this will use the file `input/LWI_watersheds.csv` to control which HUC8 watersheds will have
+By default, this will use the file `input/LWI_watersheds.cs` to control which HUC8 watersheds will have
 their streams labeled, and also control what the two-letter watershed codes are to be used for each HUC8.
 To use another watershed definition file, use the `-w` option. Use the `--help` to see all options.
+
+Also, by default stream level labels will be encoded as [base32](https://www.crockford.com/base32.html).
+To use [hexadecimal](https://en.wikipedia.org/wiki/Hexadecimal) instead, add the `--hexadecimal` command line option.
 
 Output will be stored in a directory named `output`.
 
