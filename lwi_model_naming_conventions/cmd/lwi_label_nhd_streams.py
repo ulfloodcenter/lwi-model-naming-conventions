@@ -489,75 +489,16 @@ def label_streams_for_huc8(flowline, plusflow, headwater_reaches, huc8, ws_code,
     return flowlines_by_stream_id
 
 
-WS_DATA = [
-    ("AA", "08080101", "Atchafalaya"),
-    ("AM", "08070202", "Amite"),
-    ("AR", "08040206", "Bayou D'Arbonne"),
-    ("BF", "08050001", "Boeuf"),
-    ("BK", "08040305", "Black"),
-    ("BL", "11140209", "Black Lake Bayou"),
-    ("BO", "11140205", "Bodcau Bayou"),
-    ("BT", "08080102", "Bayou Teche"),
-    ("BW", "08040205", "Bayou Bartholemew"),
-    ("CA", "08040302", "Castor"),
-    ("CB", "11140304", "Cross Bayou"),
-    ("CC", "08090301", "East Central Louisiana Coastal"),
-    ("CH", "03180005", "Bogue Chitto"),
-    ("CL", "11140306", "Caddo Lake"),
-    ("CO", "08040306", "Bayou Cocodrie"),
-    ("DU", "08040303", "Dugdemona"),
-    ("EC", "08090203", "Eastern Louisiana Coastal"),
-    ("LB", "11140203", "Loggy Bayou"),
-    ("LC", "08080206", "Lower Calcasieu"),
-    ("LF", "12010003", "Lake Fork"),
-    ("LG", "08070300", "Lower Grand"),
-    ("LI", "08040304", "Little"),
-    ("LM", "08070204", "Lake Maurepas"),
-    ("LP", "03180004", "Lower Pearl"),
-    ("LR", "08040301", "Lower Red"),
-    ("LS", "12040201", "Sabine Lake"),
-    ("MA", "08050002", "Bayou Macon"),
-    ("MB", "08070100", "Lower Mississippi-Baton Rouge"),
-    ("ME", "08080202", "Mermentau"),
-    ("MH", "08080201", "Mermentau Headwaters"),
-    ("MN", "08060100", "Lower Mississippi-Natchez"),
-    ("MO", "08090100", "Lower Mississippi-New Orleans"),
-    ("MP", "11140201", "McKinney-Posten Bayous"),
-    ("MR", "11140202", "Middle Red-Coushatta"),
-    ("OL", "08040202", "Lower Ouachita-Bayou De Loutre"),
-    ("OU", "08040207", "Lower Ouachita"),
-    ("PI", "11140206", "Bayou Pierre"),
-    ("RC", "11140204", "Red Chute"),
-    ("RI", "11140207", "Lower Red-Lake Iatt"),
-    ("SB", "11140208", "Saline Bayou"),
-    ("SL", "12010005", "Lower Sabine"),
-    ("SM", "12010002", "Middle Sabine"),
-    ("ST", "08070201", "Bayou Sara-Thompson"),
-    ("SU", "12010001", "Upper Sabine"),
-    ("TA", "08070205", "Tangipahoa"),
-    ("TC", "08090201", "Liberty Bayou-Tchefuncta"),
-    ("TE", "08050003", "Tensas"),
-    ("TI", "08070203", "Tickfaw"),
-    ("TO", "12010004", "Toledo Bend Reservoir"),
-    ("UC", "08080203", "Upper Calcasieu"),
-    ("VE", "08080103", "Vermilion"),
-    ("WC", "08090302", "West Central Louisiana Coastal"),
-    ("WF", "08080205", "West Fork Calcasieu"),
-    ("WH", "08080204", "Whisky Chitto"),
-]
-
-WS_DATA_DEBUG = [
-    ("LP", "03180004", "Lower Pearl"),
-    ("CH", "03180005", "Bogue Chitto"),
-    ("OL", "08040202", "Lower Ouachita-Bayou De Loutre"),
-    ("BW", "08040205", "Bayou Bartholemew"),
-    ("AR", "08040206", "Bayou D'Arbonne"),
-    ("OU", "08040207", "Lower Ouachita"),
-    ("LR", "08040301", "Lower Red"),
-]
+def load_watersheds_data(ws_filepath: str) -> List[Tuple[str, str, str]]:
+    watersheds = []
+    with open(ws_filepath, 'r') as csvfile:
+        ws_reader = csv.DictReader(csvfile)
+        for ws in ws_reader:
+            watersheds.append((ws['WS_code'], ws['HUC8'], ws['Name']))
+    return watersheds
 
 
-def do_label_streams_for_huc8(ws: Tuple[str, str], flowline_path: str, plusflow_path: str,
+def do_label_streams_for_huc8(ws: Tuple[str, str, str], flowline_path: str, plusflow_path: str,
                               nhd_hr: bool = False, base32: bool = False):
     print("Begin: do_label_streams_for_huc8 for watershed: {0}".format(ws))
 
@@ -620,9 +561,15 @@ def main():
     parser.add_argument('-p', '--plusflow',
                         help=('Path to SQLite file containing NHDPlus PlusFlow table. '
                               'Only required if NHDPlus HR is NOT specified.'))
+    parser.add_argument('-w', '--watersheds', type=str, default='input/LWI_watersheds.csv',
+                        help=('Path to CSV file containing watershed definitions that controls the '
+                              'HUC8 watersheds whose NHD flowlines are to be labeled.'))
+    parser.add_argument('-n', '--num_threads', type=int, default=multiprocessing.cpu_count(),
+                        help=('Number of threads to use to process watersheds. '
+                              f"Defaults to {multiprocessing.cpu_count()} on this machine."))
     parser.add_argument('--nhdhr', action='store_true', help='Use NHDPlus HR', default=False)
     parser.add_argument('--base32', action='store_true',
-                        help='Encode stream reach IDs as Crockford base32 instead of hexadecimal.', default=False)
+                        help='Encode stream reach IDs as Crockford base32 instead of hexadecimal. Default: True', default=True)
     args = parser.parse_args()
 
     flowline_path = args.flowline
@@ -630,13 +577,18 @@ def main():
     if args.plusflow:
         plusflow_path = args.plusflow
 
-    # Parallel
-    with(multiprocessing.Pool(multiprocessing.cpu_count())) as p:
-        par_args = [(ws, flowline_path, plusflow_path, args.nhdhr, args.base32) for ws in WS_DATA]
-        p.map(parallel_do_label_streams_for_huc8, par_args)
-    # Synchronous
-    # for ws in WS_DATA_DEBUG:
-    #     do_label_streams_for_huc8(ws, flowline_path, plusflow_path, args.nhdhr, args.base32)
+    # Load watershed data
+    ws_data = load_watersheds_data(args.watersheds)
+
+    if args.num_threads > 1:
+        # Parallel
+        with(multiprocessing.Pool(args.num_threads)) as p:
+            par_args = [(ws, flowline_path, plusflow_path, args.nhdhr, args.base32) for ws in ws_data]
+            p.map(parallel_do_label_streams_for_huc8, par_args)
+    else:
+        # Synchronous
+        for ws in ws_data:
+            do_label_streams_for_huc8(ws, flowline_path, plusflow_path, args.nhdhr, args.base32)
 
 
 if __name__ == '__main__':

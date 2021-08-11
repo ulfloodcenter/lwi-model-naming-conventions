@@ -35,6 +35,10 @@ lwi-label-nhd-streams -f data/NHDFlowline_Network.spatialite -p data/NHD_PlusFlo
 > Note: To encode stream level labels as [base32](https://www.crockford.com/base32.html) instead of hexadecimal,
 > add the `--base32` command line option.
 
+By default, this will use the file `input/LWI_watersheds.csv' to control which HUC8 watersheds will have
+their streams labeled, and also control what the two-letter watershed codes are to be used for each HUC8.
+To use another watershed definition file, use the `-w` option. Use the `--help` to see all options.
+
 Output will be stored in a directory named `output`.
 
 ### Combine output into one CSV file and add header
@@ -45,7 +49,7 @@ head -n 1 AA_08080101.csv | cat - /tmp/LA_HUC8_stream_labels-sorted.csv > LA_HUC
 rm /tmp/LA_HUC8_stream_labels.csv /tmp/LA_HUC8_stream_labels-sorted.csv
 ```
 
-## Appedix: setting up and using with NHDPlus HR data
+## Appendix: setting up and using with NHDPlus HR data
 NHDPlus HD currently (August 2021) seems to lack flow topology information in the NHDPlusFlow table needed to
 successfully run the LWI naming algorithm. However, the instructions below are included as a starting point for
 future use of NHDPlus HR.
