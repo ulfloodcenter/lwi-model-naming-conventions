@@ -4,8 +4,8 @@
 Louisiana Watershed Initiative (LWI) Stream Naming Convention Algorithm.
 Copyright (C) 2021-present State of Louisiana, Division of Administration, Office of Community Development.
 
-This program was developed by researchers at the Louisiana Watershed Flood Center of the University of Louisiana at
-Lafayette (https://floodcenter.louisiana.edu) with funding from the State of Louisiana, Division of Administration,
+This program was developed by researchers at the [Louisiana Watershed Flood Center](https://floodcenter.louisiana.edu)
+of the University of Louisiana at Lafayette with funding from the State of Louisiana, Division of Administration,
 Office of Community Development under the LWI program. The LWI is funded by Community Development Block Grant
 Mitigation funds from U.S. Department of Housing and Urban Development.
 
