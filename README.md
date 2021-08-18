@@ -2,9 +2,9 @@
 
 This software implements the [Louisiana Watershed Initiative (LWI)](https://www.watershed.la.gov) stream naming
 algorithm, which is part of the LWI model data naming conventions. These conventions define the naming of physical
-features (watersheds, streams) as well as hydrologic and hydraulic model elements to be incorporated in watershed
-models developed under the auspices of the LWI. These naming conventions will be published as an appendix of the
-[LWI Guidance on Modeling Methodology](https://www.watershed.la.gov).
+features (watersheds, streams) as well as HEC-HMS hydrologic and HEC-RAS hydraulic model elements to be incorporated
+in watershed models developed under the auspices of the LWI. These naming conventions will be published as an
+appendix of the [LWI Guidance on Modeling Methodology](https://www.watershed.la.gov).
 
 Faithful application of these standards is critical to ensuring that LWI models are of high quality and are consistent
 with each other, to the greatest extent practicable. Consistency between models enables interoperability of models
@@ -41,8 +41,8 @@ If not, see <https://www.gnu.org/licenses/>.
 
 ### Installation
 ```
-git clone <PUT_URL_HERE>
-cd <PUT_CLONED_DIR_HERE>
+git clone https://github.com/ulfloodcenter/lwi-model-naming-conventions.git
+cd lwi-model-naming-conventions
 python3 -m venv venv
 source venv/bin/activate
 python3 setup.py install
