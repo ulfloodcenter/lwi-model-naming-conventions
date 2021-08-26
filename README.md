@@ -33,11 +33,19 @@ If not, see <https://www.gnu.org/licenses/>.
 
 ### Pre-requisites
 - Unix-like environment ([WSL](https://docs.microsoft.com/en-us/windows/wsl/about) should work)
+- ~20 GB of free disk space for installation (about 3 GB needed after installation)
 - Python 3.7+
 - GDAL 3+ (version 2+ may work as well)
 - SQLite 3
 - 7z
 - wget
+- git
+
+Under Debian Linux (either in WSL or natively), you can install the dependencies as:
+```
+sudo apt-get update
+sudo apt-get install python3 python3-venv sqlite3 gdal-bin p7zip-full wget git
+```
 
 ### Installation
 ```
