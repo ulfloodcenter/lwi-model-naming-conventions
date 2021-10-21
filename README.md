@@ -154,7 +154,7 @@ create index if not exists nhdplusflow_tonhdpid_idx on nhdplusflow(tonhdpid);"
 ### Usage
 ```
 mkdir -p output
-lwi-label-nhd-streams -f /path/to/NHDFlowline_Network.spatialite --nhdhr
+lwi-label-nhd-streams -f /path/to/NHDPlusHR-LA.sqlite --nhdhr
 ```
 
 > WARNING: NHDPlus HD seems to lack flow topology information in the NHDPlusFlow table needed to
